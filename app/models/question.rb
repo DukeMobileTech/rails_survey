@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 # == Schema Information
 #
 # Table name: questions
@@ -50,6 +51,29 @@ class Question < ActiveRecord::Base
   acts_as_paranoid
   validates :question_identifier, uniqueness: true, presence: true, allow_blank: false
   validates :text, presence: true, allow_blank: false
+
+  def translated(code)
+    trans = translations.where(language: code)
+    "<ul>#{trans.map { |translation| "<li>#{translation.text}</li>" }.join}</ul>" unless trans.empty?
+  end
+
+  def translated_lines(code)
+    trans = translations.where(language: code)
+    sanitizer = Rails::Html::FullSanitizer.new
+    trans.map { |translation| sanitizer.sanitize translation.text }.join("\, ") unless trans.empty?
+  end
+
+  def self.export
+    sanitizer = Rails::Html::FullSanitizer.new
+    CSV.generate do |csv|
+      csv << %w[question_identifier question_set folder english swahili amharic khmer]
+      Question.all.each do |question|
+        csv << [question.question_identifier, question&.question_set&.title, question&.folder&.title,
+                sanitizer.sanitize(question.text), question.translated_lines('sw'),
+                question.translated_lines('am'), question.translated_lines('km')]
+      end
+    end
+  end
 
   def copy
     new_copy = dup
