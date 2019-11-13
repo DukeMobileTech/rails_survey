@@ -40,7 +40,7 @@ gem 'rb-readline', '~> 0.5.5'
 gem 'redis', '3.3.5'
 gem 'redis-rails', '5.0.2'
 gem 'responders', '~> 2.0'
-gem 'rubyzip', '~> 1.3'
+gem 'rubyzip', '~> 2.0'
 gem 'sass-rails', '~> 5.0.0'
 gem 'seed_dump', '3.2.4'
 gem 'sidekiq', '~> 4.2', '>= 4.2.10'
@@ -79,7 +79,7 @@ group :test do
   gem 'factory_girl_rails', '~> 4.0', require: false
   gem 'rspec-mocks', '~> 2.99.0'
   gem 'rspec-rails', '~> 2.0'
-  gem 'selenium-webdriver', '~> 2.39'
+  gem 'selenium-webdriver', '~> 3.142'
 end
 
 group :doc do
