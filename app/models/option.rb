@@ -25,6 +25,35 @@ class Option < ActiveRecord::Base
   validates :text, presence: true, allow_blank: false
   validates :identifier, presence: true, uniqueness: true
 
+  def translated(code)
+    trans = translations.where(language: code)
+    "<ul>#{trans.map { |translation| "<li>#{translation.text}</li>" }.join}</ul>" unless trans.empty?
+  end
+
+  def option_set_titles
+    "<ul>#{option_sets.map { |os| "<li>#{os.title}</li>" }.join}</ul>" unless option_sets.empty?
+  end
+
+  def option_set_title_lines
+    option_sets.map(&:title).join("\, ") unless option_sets.empty?
+  end
+
+  def translated_lines(code)
+    trans = translations.where(language: code)
+    sanitizer = Rails::Html::FullSanitizer.new
+    trans.map { |translation| sanitizer.sanitize translation.text }.join("\, ") unless trans.empty?
+  end
+
+  def self.export
+    CSV.generate do |csv|
+      csv << %w[identifier option_sets english swahili amharic khmer]
+      Option.all.each do |option|
+        csv << [option.identifier, option.option_set_title_lines, option.text,
+                option.translated_lines('sw'), option.translated_lines('am'), option.translated_lines('km')]
+      end
+    end
+  end
+
   def translated_text(language, instrument)
     return text if language == instrument.language
 
