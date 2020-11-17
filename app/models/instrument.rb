@@ -55,6 +55,7 @@ class Instrument < ActiveRecord::Base
   has_many :randomized_options, through: :randomized_factors
   has_many :next_questions, -> { order 'instrument_questions.number_in_instrument' }, through: :instrument_questions
   has_many :critical_responses, through: :questions
+  has_many :loop_questions, through: :instrument_questions
 
   has_paper_trail
   acts_as_paranoid

@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 # == Schema Information
 #
 # Table name: instrument_questions
@@ -81,6 +82,26 @@ class InstrumentQuestion < ActiveRecord::Base
 
     translation = question.translations.where(language: language).first
     translation&.text ? translation.text : question.text
+  end
+
+  def before_text_instruction
+    question.instruction&.text
+  end
+
+  def after_text_instruction
+    question.after_text_instruction&.text
+  end
+
+  def pop_up_instruction_text
+    question.pop_up_instruction&.text
+  end
+
+  def display_title
+    display&.title
+  end
+
+  def section_title
+    display&.section&.title
   end
 
   def loop_string
@@ -201,6 +222,15 @@ class InstrumentQuestion < ActiveRecord::Base
 
   def option_back_translations
     question.option_set_id ? question.option_set.back_translations : []
+  end
+
+  def looped?(l_questions = instrument.loop_questions)
+    !l_questions.where(looped: identifier).empty?
+  end
+
+  def parent(l_questions = instrument.loop_questions, iqs = instrument.instrument_questions)
+    pid = l_questions.where(looped: identifier)&.first&.parent
+    iqs.find_by_identifier(pid) if pid
   end
 
   def copy(display_id, instrument_id)

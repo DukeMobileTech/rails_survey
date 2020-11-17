@@ -27,28 +27,39 @@ class ResponseExport < ActiveRecord::Base
     update_column(:completion, percent)
   end
 
-  def export_file(format)
+  def download(format, extension)
     data = []
     survey_exports.each do |export|
       if format == 'wide'
-        data << JSON.parse(export.wide)
+        data << JSON.parse(export.wide) unless export.wide.nil?
       elsif format == 'long'
-        JSON.parse(export.long).each { |arr| data << arr }
-      elsif format == 'short'
-        JSON.parse(export.short).each { |arr| data << arr }
+        JSON.parse(export.long).each { |arr| data << arr } unless export.long.nil?
       end
     end
     data = data.reject { |arr| arr.all?(&:blank?) }
     data = data.sort { |ar1, ar2| ar1[0].to_i <=> ar2[0].to_i }
     file = Tempfile.new("#{instrument_id}-#{id}-#{format}")
-    CSV.open(file, 'w') do |csv|
-      csv << csv_headers(format)
-      if data
-        data.each do |row|
-          csv << row
+    if extension == 'csv'
+      CSV.open(file, 'w') do |csv|
+        csv << headers(format)
+        if data
+          data.each do |row|
+            csv << row
+          end
+        else
+          instrument.export_surveys if surveys.count > 0
         end
-      else
-        instrument.export_surveys if surveys.count > 0
+      end
+    elsif extension == 'xlsx'
+      Axlsx::Package.new do |p|
+        wb = p.workbook
+        wb.add_worksheet(name: instrument.title) do |sheet|
+          sheet.add_row headers(format)
+          data.each do |row|
+            sheet.add_row row
+          end
+        end
+        p.serialize(file.path)
       end
     end
     file
@@ -56,10 +67,8 @@ class ResponseExport < ActiveRecord::Base
 
   private
 
-  def csv_headers(format)
-    if format == 'short'
-      instrument.short_headers
-    elsif format == 'long'
+  def headers(format)
+    if format == 'long'
       instrument.long_headers
     elsif format == 'wide'
       instrument.wide_headers

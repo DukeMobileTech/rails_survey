@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 # == Schema Information
 #
 # Table name: questions
@@ -37,6 +38,9 @@ class Question < ActiveRecord::Base
   belongs_to :instruction
   belongs_to :folder
   belongs_to :validation
+  belongs_to :pop_up_instruction, class_name: 'Instruction'
+  belongs_to :after_text_instruction, class_name: 'Instruction'
+
   has_many :options, through: :option_set
   has_many :critical_responses, foreign_key: :question_identifier, primary_key: :question_identifier, dependent: :destroy
   has_many :responses

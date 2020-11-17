@@ -16,7 +16,7 @@ module Api
                          @instrument.questions.where(grid_id: params[:grid_id])
                        else
                          @instrument.questions.where(grid_id: nil)
-          end
+                       end
         end
 
         def show
@@ -39,9 +39,7 @@ module Api
           question = instrument.questions.find(params[:id])
           old_number = question.number_in_instrument
           question.update_attributes(question_params)
-          if old_number != question.number_in_instrument
-            ReorderQuestionsWorker.perform_async(instrument.id, old_number, question.number_in_instrument)
-          end
+          ReorderQuestionsWorker.perform_async(instrument.id, old_number, question.number_in_instrument) if old_number != question.number_in_instrument
           respond_with question
         end
 
@@ -61,7 +59,7 @@ module Api
           if params[:copy_to]
             instrument = Instrument.find(params[:copy_to])
             question = Question.find(params[:id])
-            copy_question = question.amoeba_dup
+            copy_question = question.dup
             copy_question.instrument_id = instrument.id
             copy_question.number_in_instrument = params[:q_position]
             copy_question.question_identifier = params[:q_id]
@@ -74,9 +72,7 @@ module Api
                   copy_image.save
                 end
               end
-              if question.translations
-                create_instrument_translations(question, instrument)
-              end
+              create_instrument_translations(question, instrument) if question.translations
               render json: copy_question, status: :accepted
             end
           end

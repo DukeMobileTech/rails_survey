@@ -66,6 +66,15 @@ module PdfUtils
     text "<u>#{text}</u>", align: :center, size: FONT_SIZE + 3, inline_format: true
   end
 
+  def format_section_text(text)
+    text "<u>#{remove_tags(text)}</u>", align: :center, size: FONT_SIZE + 5, style: :bold, inline_format: true
+  end
+
+  def remove_tags(text)
+    text = text.gsub('<p>', '')
+    text.gsub('</p>', '')
+  end
+
   def sanitize_text(text)
     return text if text.nil?
 
