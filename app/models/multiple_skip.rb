@@ -18,7 +18,7 @@
 class MultipleSkip < ActiveRecord::Base
   belongs_to :option, foreign_key: :option_identifier
   belongs_to :question, foreign_key: :question_identifier
-  belongs_to :instrument_question, touch: true
+  belongs_to :instrument_question, -> { with_deleted }, touch: true
   delegate :instrument, to: :instrument_question
   acts_as_paranoid
   validates :instrument_question_id, uniqueness: { scope:

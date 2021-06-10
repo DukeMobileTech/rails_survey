@@ -147,7 +147,7 @@ class Survey < ActiveRecord::Base
         iq = instrument.instrument_questions.with_deleted.where(identifier: ids[1]).first
       end
     end
-    iq.question
+    iq&.question
   end
 
   def option_labels(response)

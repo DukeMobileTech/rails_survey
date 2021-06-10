@@ -93,25 +93,29 @@ class SurveyPdf
              end
     q_text ||= iq.text
     text sanitize_text(q_text), inline_format: true
-    pop_ins = iq.question.pop_up_instruction
-    if pop_ins
-      pop_ins_text = if @survey.language == @instrument.language
-                       pop_ins.text
-                     else
-                       pop_ins.instruction_translations.where(language: @survey.language)&.first&.text
-                     end
-      pop_ins_text ||= pop_ins.text
-      text sanitize_text("<i><sup>*</sup>#{pop_ins_text}</i>"), color: '808080', inline_format: true if pop_ins_text
+    if iq.question.respond_to?(:pop_up_instruction)
+      pop_ins = iq.question.pop_up_instruction
+      if pop_ins
+        pop_ins_text = if @survey.language == @instrument.language
+                         pop_ins.text
+                       else
+                         pop_ins.instruction_translations.where(language: @survey.language)&.first&.text
+                       end
+        pop_ins_text ||= pop_ins.text
+        text sanitize_text("<i><sup>*</sup>#{pop_ins_text}</i>"), color: '808080', inline_format: true if pop_ins_text
+      end
     end
-    at_ins = iq.question.after_text_instruction
-    if at_ins
-      at_ins_text = if @survey.language == @instrument.language
-                      at_ins.text
-                    else
-                      at_ins.instruction_translations.where(language: @survey.language)&.first&.text
-                    end
-      at_ins_text ||= at_ins.text
-      text sanitize_text("<i>#{at_ins_text}</i>"), color: '808080', inline_format: true if at_ins_text
+    if iq.question.respond_to?(:after_text_instruction)
+      at_ins = iq.question.after_text_instruction
+      if at_ins
+        at_ins_text = if @survey.language == @instrument.language
+                        at_ins.text
+                      else
+                        at_ins.instruction_translations.where(language: @survey.language)&.first&.text
+                      end
+        at_ins_text ||= at_ins.text
+        text sanitize_text("<i>#{at_ins_text}</i>"), color: '808080', inline_format: true if at_ins_text
+      end
     end
     indent(20) do
       o_ins = iq.question.option_set&.instruction

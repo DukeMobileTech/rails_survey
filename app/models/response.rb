@@ -71,6 +71,8 @@ class Response < ActiveRecord::Base
   end
 
   def is_critical
+    return false if !question
+    
     if !question.select_one_variant? && !question.select_multiple_variant? && !question.list_of_boxes_variant?
       false
     elsif text.blank?

@@ -21,4 +21,8 @@ class LoopQuestion < ActiveRecord::Base
   acts_as_paranoid
   validates :instrument_question_id, uniqueness: { scope: %i[parent looped] }
   validates :looped, uniqueness: { scope: :parent }
+
+  def looped_position
+    instrument_question.instrument.instrument_questions.find_by_identifier(looped)&.number_in_instrument
+  end
 end
