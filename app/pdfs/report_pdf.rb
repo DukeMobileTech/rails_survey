@@ -124,6 +124,7 @@ class ReportPdf
     page_header_36('p4_report')
     css = @center.survey_scores.where(score_scheme_id: @score_scheme.id)
     contact = @center.contact(css)
+    contact.gsub! /"/, ''
     formatted_text center_details('p4_center', @center.name)
     move_down 10
     formatted_text center_details('p4_director', contact)
@@ -481,7 +482,7 @@ class ReportPdf
       other_domains.each do |dom|
         titles << localize_text("d#{dom.title}_title")
       end
-      text I18n.t('report.some_red_flags', domains: titles.join(', '), locale: @language), inline_format: true
+      text I18n.t('report.some_red_flags', domains: titles.join(', '), locale: @language), inline_format: true unless titles.empty?
     end
     move_down 20
   end

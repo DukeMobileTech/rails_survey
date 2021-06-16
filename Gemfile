@@ -39,7 +39,7 @@ gem 'redis', '3.3.5'
 gem 'redis-rails', '5.0.2'
 gem 'responders', '2.4.0'
 gem 'rmagick', '~> 4.2', '>= 4.2.2'
-gem 'rubocop', '~> 1.12', '>= 1.12.1', require: false
+gem 'rubocop', '~> 1.17', require: false
 gem 'rubyzip', '~> 1.3'
 gem 'sassc-rails', '~> 2.1', '>= 2.1.2'
 gem 'seed_dump', '3.2.4'
