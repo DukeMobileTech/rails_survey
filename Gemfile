@@ -43,7 +43,7 @@ gem 'rubocop', '~> 1.17', require: false
 gem 'rubyzip', '~> 1.3'
 gem 'sassc-rails', '~> 2.1', '>= 2.1.2'
 gem 'seed_dump', '3.2.4'
-gem 'sidekiq', '~> 4.2', '>= 4.2.10'
+gem 'sidekiq', '~> 5.2'
 gem 'sidekiq-client-cli', '0.1.7'
 gem 'wicked_pdf', '1.1.0'
 gem 'wkhtmltopdf-binary', '0.12.3.1'
