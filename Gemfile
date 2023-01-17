@@ -39,7 +39,7 @@ gem 'redis', '3.3.5'
 gem 'redis-rails', '5.0.2'
 gem 'responders', '2.4.0'
 gem 'rmagick', '~> 4.2', '>= 4.2.2'
-gem 'rubyzip', '~> 1.3'
+gem 'rubyzip', '~> 2.3'
 gem 'sassc-rails', '~> 2.1', '>= 2.1.2'
 gem 'seed_dump', '3.2.4'
 gem 'sidekiq', '~> 4.2', '>= 4.2.10'
@@ -76,7 +76,7 @@ group :test do
   gem 'factory_bot_rails', '~> 6.1'
   gem 'rspec-mocks', '~> 3.10', '>= 3.10.2'
   gem 'rspec-rails', '~> 5.0', '>= 5.0.1'
-  gem 'selenium-webdriver', '~> 2.39'
+  gem 'selenium-webdriver', '~> 4.7'
 end
 
 group :doc do
