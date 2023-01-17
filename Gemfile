@@ -54,7 +54,7 @@ end
 
 group :development do
   gem 'annotate', '~> 3.0', '>= 3.0.3'
-  gem 'better_errors', '2.1.1'
+  gem 'better_errors', '2.8.0'
   gem 'binding_of_caller', '0.7.2'
   gem 'bullet', '~> 6.1'
   gem 'byebug', '~> 9.0', '>= 9.0.6'
