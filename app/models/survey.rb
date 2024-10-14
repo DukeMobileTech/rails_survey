@@ -237,6 +237,8 @@ class Survey < ActiveRecord::Base
 
     responses.each do |response|
       identifier_index = headers["q_#{response.question_identifier}"]
+      next unless identifier_index
+
       row[identifier_index] = response.text if identifier_index
       short_qid_index = headers["q_#{response.question_identifier}_short_qid"]
       row[short_qid_index] = response.question_id if short_qid_index

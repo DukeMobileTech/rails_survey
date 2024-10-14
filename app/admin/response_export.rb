@@ -96,7 +96,7 @@ ActiveAdmin.register ResponseExport do
 
     def download(format, extension)
       send_file @response_export.download(format, extension), type: "text/#{extension}", filename:
-      "#{@response_export.instrument.title}_#{Time.now.to_i}_#{format}.#{extension}"
+      "#{@response_export.instrument.title}_#{Time.now.to_i}_#{format}.#{extension}", disposition: 'attachment'
     end
   end
 end
