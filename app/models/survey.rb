@@ -221,12 +221,15 @@ class Survey < ActiveRecord::Base
     end_time - start_time if end_time && start_time
   end
 
-  def write_wide_row
-    headers =
-      Rails.cache.fetch("w_w_r_h-#{instrument_id}-#{instrument_version_number}", expires_in: 30.minutes) do
-        array = instrument.wide_headers
-        Hash[array.map.with_index.to_a]
-      end
+  def write_wide_row(headers)
+    # headers =
+    #   Rails.cache.fetch("w_w_r_h-#{instrument_id}-#{instrument_version_number}", expires_in: 30.minutes) do
+    #     array = instrument.wide_headers
+    #     Hash[array.map.with_index.to_a]
+    #   end
+    # puts headers.inspect
+    # puts headers.keys.size
+
     row = [id, uuid, device&.identifier, device_label || device.label, latitude,
            longitude, instrument_id, instrument_version_number, instrument_title,
            start_time&.to_s, end_time&.to_s, survey_duration]
@@ -235,10 +238,17 @@ class Survey < ActiveRecord::Base
       row[headers[k]] = v
     end
 
+    # puts row.inspect
+    # puts row.size
+
+    # (row.size...headers.keys.size).to_a.each do |i|
+    #   row[i] = ''
+    # end
+    # puts row.inspect
+    # puts row.size
+
     responses.each do |response|
       identifier_index = headers["q_#{response.question_identifier}"]
-      next unless identifier_index
-
       row[identifier_index] = response.text if identifier_index
       short_qid_index = headers["q_#{response.question_identifier}_short_qid"]
       row[short_qid_index] = response.question_id if short_qid_index

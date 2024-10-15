@@ -334,8 +334,9 @@ class Instrument < ActiveRecord::Base
   end
 
   def write_export_rows
+    headers = Hash[wide_headers.map.with_index.to_a]
     surveys.each do |survey|
-      SurveyExportWorker.perform_async(survey.uuid)
+      SurveyExportWorker.perform_async(survey.uuid, headers)
     end
     StatusWorker.perform_in(10.seconds, response_export.id)
   end
