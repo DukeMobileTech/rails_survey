@@ -148,6 +148,10 @@ class Survey < ActiveRecord::Base
         last = question_identifier.rindex('_')
         id = question_identifier[first + 1...last]
         iq = instrument.instrument_questions.with_deleted.where(identifier: id).first
+        if iq.nil?
+          ids = id.split('_')
+          iq = instrument.instrument_questions.with_deleted.where(identifier: ids.last).first
+        end
       else
         ids = question_identifier.split('_')
         iq = instrument.instrument_questions.with_deleted.where(identifier: ids[1]).first
@@ -156,8 +160,8 @@ class Survey < ActiveRecord::Base
     iq
   end
 
-  def option_labels(response)
-    iq = find_instrument_question(response)
+  def option_labels(response, iq = nil)
+    iq = find_instrument_question(response) if iq.nil?
     vq = iq&.question
     return '' if vq.nil? || !vq.options?
 
@@ -190,7 +194,7 @@ class Survey < ActiveRecord::Base
     responses.each do |response|
       iq = find_instrument_question(response)
       row = Rails.cache.fetch("w_s_r-#{instrument_id}-#{instrument_version_number}-#{id}-#{updated_at}-#{response.id}-#{response.updated_at}", expires_in: 30.minutes) do
-        [identifier, id, response.question_identifier, sanitize(iq&.question&.text), response.text, option_labels(response),
+        [identifier, id, response.question_identifier, sanitize(iq&.question&.text), response.text, option_labels(response, iq),
          response.special_response, response.other_response]
       end
       row.map! { |item| item || '' }
@@ -222,14 +226,6 @@ class Survey < ActiveRecord::Base
   end
 
   def write_wide_row(headers)
-    # headers =
-    #   Rails.cache.fetch("w_w_r_h-#{instrument_id}-#{instrument_version_number}", expires_in: 30.minutes) do
-    #     array = instrument.wide_headers
-    #     Hash[array.map.with_index.to_a]
-    #   end
-    # puts headers.inspect
-    # puts headers.keys.size
-
     row = [id, uuid, device&.identifier, device_label || device.label, latitude,
            longitude, instrument_id, instrument_version_number, instrument_title,
            start_time&.to_s, end_time&.to_s, survey_duration]
@@ -237,15 +233,6 @@ class Survey < ActiveRecord::Base
     metadata&.each do |k, v|
       row[headers[k]] = v
     end
-
-    # puts row.inspect
-    # puts row.size
-
-    # (row.size...headers.keys.size).to_a.each do |i|
-    #   row[i] = ''
-    # end
-    # puts row.inspect
-    # puts row.size
 
     responses.each do |response|
       identifier_index = headers["q_#{response.question_identifier}"]
@@ -260,7 +247,7 @@ class Survey < ActiveRecord::Base
       other_identifier_index = headers["q_#{response.question_identifier}_other"]
       row[other_identifier_index] = response.other_response if other_identifier_index
       label_index = headers["q_#{response.question_identifier}_label"]
-      row[label_index] = option_labels(response) if label_index
+      row[label_index] = option_labels(response, iq) if label_index
       question_version_index = headers["q_#{response.question_identifier}_version"]
       row[question_version_index] = response.question_version if question_version_index
       question_text_index = headers["q_#{response.question_identifier}_text"]
@@ -297,7 +284,7 @@ class Survey < ActiveRecord::Base
          response.instrument_version_number, response.question_version, instrument_title, id,
          response.survey_uuid, device_id, device_uuid, device_label,
          iq&.question&.question_type, sanitize(iq&.question&.text),
-         response.text, option_labels(response), response.special_response,
+         response.text, option_labels(response, iq), response.special_response,
          response.other_response, response.time_started&.to_s, response.time_ended&.to_s,
          response.device_user.try(:id), response.device_user.try(:username),
          start_time&.to_s, end_time&.to_s, survey_duration]

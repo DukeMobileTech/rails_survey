@@ -387,11 +387,10 @@ class Instrument < ActiveRecord::Base
             end
           end
         end
-      else
-        variable_identifiers << iq.identifier unless variable_identifiers.include? iq.identifier
-        question_identifier_variables.each do |variable|
-          variable_identifiers << iq.identifier + variable unless variable_identifiers.include? iq.identifier + variable
-        end
+      end
+      variable_identifiers << iq.identifier unless variable_identifiers.include? iq.identifier
+      question_identifier_variables.each do |variable|
+        variable_identifiers << iq.identifier + variable unless variable_identifiers.include? iq.identifier + variable
       end
     end
     variable_identifiers.map! { |identifier| "q_#{identifier}" }
