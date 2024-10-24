@@ -32,6 +32,8 @@ class ResponseExport < ActiveRecord::Base
     survey_exports.each do |export|
       if format == 'wide'
         data << JSON.parse(export.wide) unless export.wide.nil?
+      elsif format == 'short'
+        data << JSON.parse(export.short) unless export.short.nil?
       elsif format == 'long'
         JSON.parse(export.long).each { |arr| data << arr } unless export.long.nil?
       end
@@ -70,6 +72,8 @@ class ResponseExport < ActiveRecord::Base
   def headers(format)
     if format == 'long'
       instrument.long_headers
+    elsif format == 'short'
+      instrument.short_headers
     elsif format == 'wide'
       instrument.wide_headers
     end

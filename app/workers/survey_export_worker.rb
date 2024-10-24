@@ -2,7 +2,7 @@ class SurveyExportWorker
   include Sidekiq::Worker
   sidekiq_options queue: 'export'
 
-  def perform(survey_uuid, wide_headers)
+  def perform(survey_uuid, wide_headers, short_headers)
     survey = Survey.includes(:responses).where(uuid: survey_uuid).try(:first)
     SurveyExport.create(survey_id: survey.id) unless survey.survey_export
 
@@ -11,5 +11,6 @@ class SurveyExportWorker
     survey.survey_export.update(last_response_at: nil)
     survey.write_long_row
     survey.write_wide_row(wide_headers)
+    survey.write_short_row(short_headers)
   end
 end

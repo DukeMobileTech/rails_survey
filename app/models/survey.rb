@@ -189,18 +189,23 @@ class Survey < ActiveRecord::Base
     sanitizer.sanitize(str)
   end
 
-  def write_short_row
-    rows = []
+  def write_short_row(headers)
+    row = [id]
     responses.each do |response|
+      identifier_index = headers["q_#{response.question_identifier}"]
+      row[identifier_index] = response.text if identifier_index
       iq = find_instrument_question(response)
-      row = Rails.cache.fetch("w_s_r-#{instrument_id}-#{instrument_version_number}-#{id}-#{updated_at}-#{response.id}-#{response.updated_at}", expires_in: 30.minutes) do
-        [identifier, id, response.question_identifier, sanitize(iq&.question&.text), response.text, option_labels(response, iq),
-         response.special_response, response.other_response]
-      end
-      row.map! { |item| item || '' }
-      rows << row
+      special_identifier_index = headers["q_#{response.question_identifier}_special"]
+      row[special_identifier_index] = response.special_response if special_identifier_index
+      other_identifier_index = headers["q_#{response.question_identifier}_other"]
+      row[other_identifier_index] = response.other_response if other_identifier_index
+      label_index = headers["q_#{response.question_identifier}_label"]
+      row[label_index] = option_labels(response, iq) if label_index
+      question_text_index = headers["q_#{response.question_identifier}_text"]
+      row[question_text_index] = sanitize(iq&.question&.text) if question_text_index
     end
-    survey_export.update(short: rows.to_s, last_response_at: responses.pluck(:updated_at).max)
+    row.map! { |item| item || '' }
+    survey_export.update(short: row.to_s, last_response_at: responses.pluck(:updated_at).max)
   end
 
   def validation_identifier

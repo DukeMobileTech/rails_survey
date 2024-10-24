@@ -334,16 +334,43 @@ class Instrument < ActiveRecord::Base
   end
 
   def write_export_rows
-    headers = Hash[wide_headers.map.with_index.to_a]
+    w_headers = Hash[wide_headers.map.with_index.to_a]
+    s_headers = Hash[short_headers.map.with_index.to_a]
     surveys.each do |survey|
-      SurveyExportWorker.perform_async(survey.uuid, headers)
+      SurveyExportWorker.perform_async(survey.uuid, w_headers, s_headers)
     end
     StatusWorker.perform_in(10.seconds, response_export.id)
   end
 
   def short_headers
-    %w[identifier survey_id question_identifier question_text response_text
-       response_label special_response other_response]
+    var_ids = []
+    qid_vars = %w[_label _special _other _text]
+    iqs = instrument_questions.with_deleted.order(:number_in_instrument)
+    iqs.each do |iq|
+      if !iq.loop_questions.empty?
+        iq.loop_questions.each do |lq|
+          if iq.question.question_type == 'INTEGER'
+            (1..12).each do |n|
+              create_loop_question(lq, var_ids, qid_vars, n)
+            end
+          elsif !lq.option_indices.blank?
+            lq.option_indices.split(',').each do |ind|
+              create_loop_question(lq, var_ids, qid_vars, ind)
+            end
+          else
+            iq.question.options.each_with_index do |_option, idx|
+              create_loop_question(lq, var_ids, qid_vars, idx)
+            end
+          end
+        end
+      end
+      var_ids << iq.identifier unless var_ids.include? iq.identifier
+      qid_vars.each do |variable|
+        var_ids << iq.identifier + variable unless var_ids.include?(iq.identifier + variable)
+      end
+    end
+    var_ids.map! { |identifier| "q_#{identifier}" }
+    %w[survey_id] + var_ids
   end
 
   def long_headers
