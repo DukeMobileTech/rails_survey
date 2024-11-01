@@ -6,7 +6,7 @@ class SurveyExportWorker
     survey = Survey.includes(:responses).where(uuid: survey_uuid).try(:first)
     SurveyExport.create(survey_id: survey.id) unless survey.survey_export
 
-    return if survey.responses.pluck(:updated_at).max == survey.survey_export.last_response_at && !survey.survey_export.wide.nil? && !survey.survey_export.long.nil?
+    return if survey.responses.pluck(:updated_at).max == survey.survey_export.last_response_at && !survey.survey_export.wide.nil? && !survey.survey_export.long.nil? && !survey.survey_export.short.nil?
 
     survey.survey_export.update(last_response_at: nil)
     survey.write_long_row

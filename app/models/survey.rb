@@ -136,11 +136,11 @@ class Survey < ActiveRecord::Base
 
   def find_instrument_question(response)
     iq = instrument.instrument_questions.with_deleted.where(id: response.question_id).first
-    iq = instrument_question_by_identifier(response.question_identifier) if iq.nil?
+    iq = self.class.instrument_question_by_identifier(instrument, response.question_identifier) if iq.nil?
     iq
   end
 
-  def instrument_question_by_identifier(question_identifier)
+  def self.instrument_question_by_identifier(instrument, question_identifier)
     iq = instrument.instrument_questions.with_deleted.where(identifier: question_identifier).first
     if iq.nil?
       if question_identifier.count('_') > 2
@@ -195,14 +195,8 @@ class Survey < ActiveRecord::Base
       identifier_index = headers["q_#{response.question_identifier}"]
       row[identifier_index] = response.text if identifier_index
       iq = find_instrument_question(response)
-      special_identifier_index = headers["q_#{response.question_identifier}_special"]
-      row[special_identifier_index] = response.special_response if special_identifier_index
-      other_identifier_index = headers["q_#{response.question_identifier}_other"]
-      row[other_identifier_index] = response.other_response if other_identifier_index
       label_index = headers["q_#{response.question_identifier}_label"]
       row[label_index] = option_labels(response, iq) if label_index
-      question_text_index = headers["q_#{response.question_identifier}_text"]
-      row[question_text_index] = sanitize(iq&.question&.text) if question_text_index
     end
     row.map! { |item| item || '' }
     survey_export.update(short: row.to_s, last_response_at: responses.pluck(:updated_at).max)

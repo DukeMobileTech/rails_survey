@@ -344,7 +344,7 @@ class Instrument < ActiveRecord::Base
 
   def short_headers
     var_ids = []
-    qid_vars = %w[_label _special _other _text]
+    qid_vars = %w[_label]
     iqs = instrument_questions.with_deleted.order(:number_in_instrument)
     iqs.each do |iq|
       if !iq.loop_questions.empty?
@@ -371,6 +371,23 @@ class Instrument < ActiveRecord::Base
     end
     var_ids.map! { |identifier| "q_#{identifier}" }
     %w[survey_id] + var_ids
+  end
+
+  def question_text_row(csv_headers)
+    row = Array.new(csv_headers.size, '')
+    sanitizer = Rails::Html::FullSanitizer.new
+    csv_headers.each_with_index do |qid, index|
+      next unless qid.start_with?('q_')
+
+      identifier = qid[2..-1]
+      identifier = identifier[0..-7] if identifier.end_with?('_label')
+      iq = instrument_questions.with_deleted.where(identifier: identifier).first
+      iq = Survey.instrument_question_by_identifier(self, identifier) if iq.nil?
+      next unless iq
+
+      row[index] = sanitizer.sanitize(iq.question.text)
+    end
+    row
   end
 
   def long_headers

@@ -41,9 +41,12 @@ class ResponseExport < ActiveRecord::Base
     data = data.reject { |arr| arr.all?(&:blank?) }
     data = data.sort { |ar1, ar2| ar1[0].to_i <=> ar2[0].to_i }
     file = Tempfile.new("#{instrument_id}-#{id}-#{format}")
+    header_row = headers(format)
+    q_text_row = instrument.question_text_row(header_row) if format == 'short'
     if extension == 'csv'
       CSV.open(file, 'w') do |csv|
-        csv << headers(format)
+        csv << header_row
+        csv << q_text_row if format == 'short'
         if data
           data.each do |row|
             csv << row
@@ -56,7 +59,8 @@ class ResponseExport < ActiveRecord::Base
       Axlsx::Package.new do |p|
         wb = p.workbook
         wb.add_worksheet(name: instrument.title.truncate(31)) do |sheet|
-          sheet.add_row headers(format)
+          sheet.add_row header_row
+          sheet.add_row q_text_row if format == 'short'
           data.each do |row|
             sheet.add_row row
           end
