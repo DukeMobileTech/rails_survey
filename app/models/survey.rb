@@ -136,8 +136,8 @@ class Survey < ActiveRecord::Base
 
   def find_instrument_question(response)
     iq = instrument.instrument_questions.with_deleted.where(id: response.question_id).first
-    iq = self.class.instrument_question_by_identifier(instrument, response.question_identifier) if iq.nil?
-    iq
+    return iq if iq&.identifier == response.question_identifier
+    self.class.instrument_question_by_identifier(instrument, response.question_identifier)
   end
 
   def self.instrument_question_by_identifier(instrument, question_identifier)

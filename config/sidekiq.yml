@@ -7,3 +7,5 @@
   - [questions_reorder, 2]
 production:
   :concurrency: 2
+development:
+  :concurrency: 2
