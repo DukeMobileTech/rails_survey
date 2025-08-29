@@ -180,6 +180,46 @@ class Project < ActiveRecord::Base
     read_attribute(:survey_aggregator).nil? ? 'device_uuid' : read_attribute(:survey_aggregator)
   end
 
+  def to_csv
+    CSV.generate do |csv|
+      export(csv)
+    end
+  end
+
+  def export(csv)
+    published_instruments = instruments.includes(:instrument_questions).where(published: true)
+    all_headers = Set['instrument_id', 'survey_id']
+    published_instruments.each do |instrument|
+      instrument_headers = instrument.short_headers
+      instrument_headers.shift # Remove the first element
+      instrument_headers.each_slice(2) do |qid| # Iterate over question IDs
+        all_headers.merge([qid.first, qid.last, "#{qid.first}_text"])
+      end
+    end
+    all_headers = all_headers.to_a
+    headers = Hash[all_headers.map.with_index.to_a]
+    csv << all_headers
+    published_instruments.each do |instrument|
+      instrument_headers = instrument.short_headers
+      instrument_headers.shift
+      instrument.surveys.includes(:survey_export).each do |survey|
+        row = Array.new(all_headers.size)
+        row[0] = instrument.id
+        row[1] = survey.id
+        unless survey.survey_export.short.nil?
+          data = JSON.parse(survey.survey_export.short)
+          data.shift
+          survey_hash = Hash[instrument_headers.zip(data)]
+          survey_hash.each do |question_identifier, response_text|
+            qid_index = headers[question_identifier]
+            row[qid_index] = response_text if qid_index
+          end
+          csv << row
+        end
+      end
+    end
+  end
+
   private
 
   def sanitize(hash)

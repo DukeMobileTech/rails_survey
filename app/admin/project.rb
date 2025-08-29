@@ -2,11 +2,21 @@ ActiveAdmin.register Project do
   actions :all, except: [:destroy]
   permit_params :name, :description, :survey_aggregator
   scope_to :current_user, unless: proc { current_user.super_admin? }
+
+  member_action :to_csv, method: :get do
+    redirect_to resource_path
+  end
+
+  action_item :to_csv, only: :show do
+    link_to 'Download CSV', to_csv_admin_project_path(params[:id]), method: :get
+  end
+
   sidebar 'Project Associations', only: :show do
     ul do
       li link_to 'Survey Responses', admin_project_surveys_path(params[:id])
       li link_to 'Survey Exports', admin_project_response_exports_path(params[:id])
       li link_to 'Survey Variables', admin_project_questions_path(params[:id])
+      li link_to 'Instruments', admin_project_instruments_path(params[:id])
     end
   end
 
@@ -47,5 +57,16 @@ ActiveAdmin.register Project do
       f.input :survey_aggregator, collection: Settings.metric_keys
     end
     f.actions
+  end
+
+  controller do
+    def to_csv
+      project = Project.find(params[:id])
+      temp_file = Tempfile.new(["project-#{project.id}", ".csv"])
+      temp_file.write(project.to_csv)
+      temp_file.rewind
+      send_file temp_file.path, type: 'text/csv; charset=iso-8859-1; header=present',
+                  disposition: "attachment; filename=#{project.name}.csv"
+    end
   end
 end

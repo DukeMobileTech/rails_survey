@@ -228,22 +228,12 @@ class Instrument < ActiveRecord::Base
     format << ['Version number:', current_version_number]
     format << ['Language:', language]
     format << ["\n"]
-    format << %w[number_in_instrument question_identifier question_type question_instructions question_text] + instrument_translation_languages
-    questions.each do |question|
-      format << [question.number_in_instrument, question.question_identifier, question.question_type, sanitizer.sanitize(question.instructions), sanitizer.sanitize(question.text)] + translations_for_object(question)
-      question.options.each do |option|
-        format << ['', '', '', "Option for question #{question.question_identifier}", option.text] + translations_for_object(option)
-        next unless option.skips
-
-        option.skips.each do |skip|
-          format << ['', '', '', "For option #{option.text}, SKIP question", skip.question_identifier]
-        end
+    format << %w[number_in_instrument question_identifier question_type question_instructions question_text] #+ instrument_translation_languages
+    instrument_questions.order(:number_in_instrument).each do |iq|
+      format << [iq.number_in_instrument, iq.identifier, iq.question.question_type, sanitizer.sanitize(iq.question.instruction&.text), sanitizer.sanitize(iq.question.text)] #+ translations_for_object(question)
+      iq.question.options.each do |option|
+        format << ['', '', '', "Option for question #{iq.question.question_identifier}", option.text] #+ translations_for_object(option)
       end
-      if question.reg_ex_validation_message
-        format << ['', '', '', "Regular expression failure message for #{question.question_identifier}",
-                   question.reg_ex_validation_message]
-      end
-      format << ['', '', '', 'Question identifies survey', 'YES'] if question.identifies_survey
     end
   end
 
@@ -344,7 +334,7 @@ class Instrument < ActiveRecord::Base
 
   def short_headers
     var_ids = []
-    qid_vars = %w[_label]
+    qid_vars = %w[_label _text]
     iqs = instrument_questions.with_deleted.order(:number_in_instrument)
     iqs.each do |iq|
       if !iq.loop_questions.empty?
@@ -511,6 +501,26 @@ class Instrument < ActiveRecord::Base
       (displays - preserved_displays).each(&:destroy)
       (instrument_questions - preserved_questions).each(&:destroy)
     end
+  end
+
+  def instrument_question_by_identifier(question_identifier)
+    iq = instrument_questions.with_deleted.where(identifier: question_identifier).first
+    if iq.nil?
+      if question_identifier.count('_') > 2
+        first = question_identifier.index('_')
+        last = question_identifier.rindex('_')
+        id = question_identifier[first + 1...last]
+        iq = instrument_questions.with_deleted.where(identifier: id).first
+        if iq.nil?
+          ids = id.split('_')
+          iq = instrument_questions.with_deleted.where(identifier: ids.last).first
+        end
+      else
+        ids = question_identifier.split('_')
+        iq = instrument_questions.with_deleted.where(identifier: ids[1]).first
+      end
+    end
+    iq
   end
 
   private

@@ -163,7 +163,10 @@ class Survey < ActiveRecord::Base
   def option_labels(response, iq = nil)
     iq = find_instrument_question(response) if iq.nil?
     vq = iq&.question
-    return '' if vq.nil? || !vq.options?
+    return '' if vq.nil?
+
+    opts = vq.options.to_a
+    return '' if opts.empty?
 
     labels = []
     if Settings.list_question_types.include?(vq.question_type)
@@ -197,6 +200,8 @@ class Survey < ActiveRecord::Base
       iq = find_instrument_question(response)
       label_index = headers["q_#{response.question_identifier}_label"]
       row[label_index] = option_labels(response, iq) if label_index
+      question_text_index = headers["q_#{response.question_identifier}_text"]
+      row[question_text_index] = sanitize(iq&.question&.text) if question_text_index
     end
     row.map! { |item| item || '' }
     survey_export.update(short: row.to_s, last_response_at: responses.pluck(:updated_at).max)
