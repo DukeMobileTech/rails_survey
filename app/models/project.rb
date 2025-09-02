@@ -220,6 +220,95 @@ class Project < ActiveRecord::Base
     end
   end
 
+  def questions_to_csv
+    CSV.generate do |csv|
+      header, row = instrument_export
+      csv << header
+      csv << row
+    end
+  end
+
+  def instrument_export
+    sanitizer = Rails::Html::FullSanitizer.new
+    option_headers = {}
+    option_data = {}
+    iq_data = {}
+    published_instruments = instruments.includes(instrument_questions: { loop_questions: {}, question: :options }).where(published: true)
+    published_instruments.each do |instrument|
+      instrument.instrument_questions.each do |iq|
+        next if iq_data.key?("q_#{iq.identifier}")
+
+        if iq.loop_questions.exists?
+          handle_loop_question(instrument, iq, option_headers, option_data, iq_data, sanitizer)
+        end
+
+        q_option_headers = []
+        q_option_data = []
+        iq.question.options.each_with_index do |option, index|
+          q_option_headers << "q_#{iq.identifier}_#{index}"
+          q_option_data << sanitizer.sanitize(option.text)
+        end
+        option_headers["q_#{iq.identifier}"] = q_option_headers
+        option_data["q_#{iq.identifier}"] = q_option_data
+        iq_data["q_#{iq.identifier}"] = sanitizer.sanitize(iq.question.text)
+      end
+    end
+    header = []
+    row = []
+    iq_data.each do |identifier, question_text|
+      header << identifier
+      row << question_text
+      header += option_headers[identifier]
+      row += option_data[identifier]
+    end
+    [header, row]
+  end
+
+  def handle_loop_question(instrument, iq, option_headers, option_data, iq_data, sanitizer)
+    iq.loop_questions.each do |lq|
+      parent = instrument.instrument_question_by_identifier(lq.parent)
+      looped = instrument.instrument_question_by_identifier(lq.looped)
+      if iq.question.question_type == 'INTEGER'
+        (1..12).each do |n|
+          identifier = "q_#{lq.parent}_#{lq.looped}_#{n}"
+          if !iq_data.key?(identifier)
+            iq_data[identifier] = sanitizer.sanitize("#{parent.question.text} : #{looped.question.text} : #{n}")
+            handle_looped_question_options(looped, identifier, option_headers, option_data, sanitizer)
+          end
+        end
+      elsif !lq.option_indices.blank?
+        lq.option_indices.split(',').each do |ind|
+          identifier = "q_#{lq.parent}_#{lq.looped}_#{ind}"
+          if !iq_data.key?(identifier)
+            option = parent.question.options[ind.to_i]
+            iq_data[identifier] = sanitizer.sanitize("#{parent.question.text} : #{looped.question.text} : #{option.text}")
+            handle_looped_question_options(looped, identifier, option_headers, option_data, sanitizer)
+          end
+        end
+      else
+        iq.question.options.each_with_index do |_option, idx|
+          identifier = "q_#{lq.parent}_#{lq.looped}_#{idx}"
+          if !iq_data.key?(identifier)
+            option = parent.question.options[idx]
+            iq_data[identifier] = sanitizer.sanitize("#{parent.question.text} : #{looped.question.text} : #{option.text}")
+            handle_looped_question_options(looped, identifier, option_headers, option_data, sanitizer)
+          end
+        end
+      end
+    end
+  end
+
+  def handle_looped_question_options(looped, identifier, option_headers, option_data, sanitizer)
+    q_option_headers = []
+    q_option_data = []
+    looped.question.options.each_with_index do |option, index|
+      q_option_headers << "#{identifier}_#{index}"
+      q_option_data << sanitizer.sanitize(option.text)
+    end
+    option_headers[identifier] = q_option_headers
+    option_data[identifier] = q_option_data
+  end
+
   private
 
   def sanitize(hash)

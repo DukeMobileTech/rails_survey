@@ -8,7 +8,15 @@ ActiveAdmin.register Project do
   end
 
   action_item :to_csv, only: :show do
-    link_to 'Download CSV', to_csv_admin_project_path(params[:id]), method: :get
+    link_to 'Download Dataset', to_csv_admin_project_path(params[:id]), method: :get
+  end
+
+  member_action :questions_to_csv, method: :get do
+    redirect_to resource_path
+  end
+
+  action_item :questions_to_csv, only: :show do
+    link_to 'Download Variables', questions_to_csv_admin_project_path(params[:id]), method: :get
   end
 
   sidebar 'Project Associations', only: :show do
@@ -67,6 +75,15 @@ ActiveAdmin.register Project do
       temp_file.rewind
       send_file temp_file.path, type: 'text/csv; charset=iso-8859-1; header=present',
                   disposition: "attachment; filename=#{project.name}.csv"
+    end
+
+    def questions_to_csv
+      project = Project.find(params[:id])
+      temp_file = Tempfile.new(["project-#{project.id}-questions", ".csv"])
+      temp_file.write(project.questions_to_csv)
+      temp_file.rewind
+      send_file temp_file.path, type: 'text/csv; charset=iso-8859-1; header=present',
+                  disposition: "attachment; filename=#{project.name}-questions.csv"
     end
   end
 end
