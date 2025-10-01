@@ -228,11 +228,11 @@ class Instrument < ActiveRecord::Base
     format << ['Version number:', current_version_number]
     format << ['Language:', language]
     format << ["\n"]
-    format << %w[number_in_instrument question_identifier question_type question_instructions question_text] #+ instrument_translation_languages
+    format << %w[number_in_instrument section display question_identifier question_type question_instructions question_text] #+ instrument_translation_languages
     instrument_questions.order(:number_in_instrument).each do |iq|
-      format << [iq.number_in_instrument, iq.identifier, iq.question.question_type, sanitizer.sanitize(iq.question.instruction&.text), sanitizer.sanitize(iq.question.text)] #+ translations_for_object(question)
-      iq.question.options.each do |option|
-        format << ['', '', '', "Option for question #{iq.question.question_identifier}", option.text] #+ translations_for_object(option)
+      format << [iq.number_in_instrument, iq.section_title, iq.display_title, "q$#{iq.identifier}", iq.question.question_type, sanitizer.sanitize(iq.question.instruction&.text), sanitizer.sanitize(iq.question.text)] #+ translations_for_object(question)
+      iq.question.options.each_with_index do |option, index|
+        format << ['', '','', '', '', "q$#{iq.identifier}$#{index}", option.text] #+ translations_for_object(option)
       end
     end
   end
