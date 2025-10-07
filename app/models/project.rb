@@ -220,6 +220,61 @@ class Project < ActiveRecord::Base
     end
   end
 
+  def similar_questions_to_csv
+    sanitizer = Rails::Html::FullSanitizer.new
+    # Use the project's published instruments and eager load questions + options
+    instrument_list = published_instruments.includes(instrument_questions: { question: :options }).to_a
+
+    header = ['question_text', 'question_options'] + instrument_list.map(&:title)
+
+    # grouped[[text, options_text]] => array per-instrument of identifier arrays
+    grouped = Hash.new { |h, k| h[k] = Array.new(instrument_list.size) { [] } }
+
+    instrument_list.each_with_index do |inst, idx|
+      inst.instrument_questions.each do |iq|
+        q = iq.question
+        text = sanitizer.sanitize(q.text).to_s.strip
+        options_text = q.options.map { |opt| sanitizer.sanitize(opt.text).to_s.strip }.join('$')
+        key = [text, options_text]
+        grouped[key][idx] << "q$#{iq.identifier}"
+      end
+    end
+
+    CSV.generate do |csv|
+      csv << header
+
+      # Preserve insertion order (first-seen grouping). Change to sort if desired.
+      grouped.each do |(text, options_text), per_instrument_arrays|
+        # Primary row: question text + identifiers per instrument
+        question_row = [text, '']
+        instrument_cells = per_instrument_arrays.map { |arr| arr.empty? ? '' : arr.join('; ') }
+        question_row.concat(instrument_cells)
+        csv << question_row
+
+        # Subsequent rows: one row per option; no identifiers repeated on option rows
+        next if options_text.to_s.strip.empty?
+
+        options = options_text.split('$')
+        options.each_with_index do |opt_text, opt_idx|
+          opt = opt_text.to_s.strip
+          next if opt.empty?
+          option_row = ['', opt]
+          # For each instrument, if it has one or more instrument_question identifiers,
+          # append q$<identifier>$<option_index> (join multiple with '; ')
+          instrument_cells = per_instrument_arrays.map do |id_arr|
+            if id_arr.empty?
+              ''
+            else
+              id_arr.map { |iid| "#{iid}$#{opt_idx}" }.join('; ')
+            end
+          end
+          option_row.concat(instrument_cells)
+          csv << option_row
+        end
+      end
+    end
+  end
+
   def questions_to_csv
     CSV.generate do |csv|
       header, row = instrument_export
