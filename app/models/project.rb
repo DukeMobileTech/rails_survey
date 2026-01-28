@@ -220,6 +220,63 @@ class Project < ActiveRecord::Base
     end
   end
 
+  def neighboring_questions_to_csv
+    sort_position = 7 # 6
+    decimal_limit = 0.00001
+    distance_cutoff = 2.0
+    similar_limit = 5
+    sanitizer = Rails::Html::FullSanitizer.new
+    header = ['question_number', 'question_sequence', 'instrument_title', 'section_title', 'display_title', 'question_identifier', 'neighbor_distance', 'neighbor_text_distance', 'neighbor_option_distance', 'question_text', 'sanitized_question_text']
+    20.times do |i|
+      header << "option_#{i}"
+    end
+
+    CSV.generate do |csv|
+      csv << header
+      published_instruments.order(:id).each do |instrument|
+        instrument.instrument_questions.includes(question: :options).order(:number_in_instrument).each do |iq|
+          text = sanitizer.sanitize(iq.question.text).to_s.strip
+          row = [iq.number_in_instrument, '', instrument.title, iq.section_title, iq.display_title, "q$#{iq.identifier}", "", "", "", text, iq.sanitized_question_text]
+          iq.question.options.each do |opt|
+            row << sanitizer.sanitize(opt.text).to_s.strip
+          end
+          csv << row
+          neighbor_rows = []
+          other_instruments = published_instruments.where.not(id: instrument.id).order(:id)
+          other_instruments.each do |other_instrument|
+            # neighbors = iq.most_similar_in_instrument(other_instrument, limit: similar_limit, distance: 'cosine')
+            neighbors = iq.most_similar_in_instrument_text(other_instrument, limit: similar_limit, distance: 'cosine')
+            next if neighbors.blank?
+            neighbors.each_with_index do |neighbor, index|
+              if neighbor && neighbor.neighbor_distance <= distance_cutoff
+                neighbor_text = sanitizer.sanitize(neighbor.question.text).to_s.strip
+                # distance1 = neighbor.neighbor_distance
+                distance1 = iq.neighbor_combined_distance(neighbor)
+                distance1 = (distance1.abs < decimal_limit ? 0.0 : distance1.round(5)) if distance1
+                # distance2 = iq.neighbor_text_distance(neighbor)
+                distance2 = neighbor.neighbor_distance
+                distance2 = (distance2.abs < decimal_limit ? 0.0 : distance2.round(5)) if distance2
+                distance3 = iq.neighbor_option_distance(neighbor)
+                distance3 = (distance3.abs < decimal_limit ? 0.0 : distance3.round(5)) if distance3
+                row = ['', index + 1, other_instrument.title, neighbor.section_title, neighbor.display_title, "q$#{neighbor.identifier}", distance1, distance2, distance3, neighbor_text, neighbor.sanitized_question_text]
+                neighbor.question.options.each do |opt|
+                  row << sanitizer.sanitize(opt.text).to_s.strip
+                end
+                neighbor_rows << row
+              end
+            end
+          end
+          # sort neighbor_rows by neighbor_distance (7th/8th column) from smallest to largest
+          neighbor_rows.sort_by! { |r| r[sort_position] || Float::INFINITY }
+          neighbor_rows.each do |nrow|
+            csv << nrow
+          end
+          csv << [] # Blank line between different questions
+        end
+      end
+    end
+  end
+
   def similar_questions_to_csv
     sanitizer = Rails::Html::FullSanitizer.new
     # Use the project's published instruments and eager load questions + options

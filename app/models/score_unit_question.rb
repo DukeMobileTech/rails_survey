@@ -2,12 +2,12 @@
 #
 # Table name: score_unit_questions
 #
-#  id                     :integer          not null, primary key
-#  score_unit_id          :integer
-#  instrument_question_id :integer
-#  created_at             :datetime
-#  updated_at             :datetime
-#  deleted_at             :datetime
+#  id            :integer          not null, primary key
+#  score_unit_id :integer
+#  question_id   :integer
+#  created_at    :datetime
+#  updated_at    :datetime
+#  deleted_at    :datetime
 #
 
 class ScoreUnitQuestion < ActiveRecord::Base

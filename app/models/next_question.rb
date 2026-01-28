@@ -14,7 +14,6 @@
 #  deleted_at               :datetime
 #  value                    :string
 #  complete_survey          :boolean
-#  value_operator           :string
 #
 
 class NextQuestion < ActiveRecord::Base

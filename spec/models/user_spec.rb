@@ -19,6 +19,10 @@
 #  failed_attempts        :integer          default(0)
 #  unlock_token           :string
 #  locked_at              :datetime
+#  gauth_secret           :string
+#  gauth_enabled          :string           default("f")
+#  gauth_tmp              :string
+#  gauth_tmp_datetime     :datetime
 #  invitation_token       :string
 #  invitation_created_at  :datetime
 #  invitation_sent_at     :datetime
@@ -27,11 +31,6 @@
 #  invited_by_id          :integer
 #  invited_by_type        :string
 #  invitations_count      :integer          default(0)
-#  gauth_tmp_datetime     :datetime
-#  gauth_tmp              :string
-#  gauth_enabled          :string
-#  gauth_secret           :string
-#  password_digest        :string
 #
 
 require "spec_helper"

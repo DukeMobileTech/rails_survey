@@ -2,15 +2,14 @@
 #
 # Table name: raw_scores
 #
-#  id                :integer          not null, primary key
-#  score_unit_id     :integer
-#  survey_score_id   :integer
-#  value             :float
-#  created_at        :datetime
-#  updated_at        :datetime
-#  uuid              :string
-#  survey_score_uuid :string
-#  deleted_at        :datetime
+#  id            :integer          not null, primary key
+#  score_unit_id :integer
+#  score_id      :integer
+#  value         :float
+#  created_at    :datetime
+#  updated_at    :datetime
+#  uuid          :string
+#  score_uuid    :string
 #
 
 class RawScore < ActiveRecord::Base

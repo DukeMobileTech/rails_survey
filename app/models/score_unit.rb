@@ -2,14 +2,16 @@
 #
 # Table name: score_units
 #
-#  id           :integer          not null, primary key
-#  weight       :float
-#  created_at   :datetime
-#  updated_at   :datetime
-#  score_type   :string
-#  deleted_at   :datetime
-#  subdomain_id :integer
-#  title        :string
+#  id              :integer          not null, primary key
+#  score_scheme_id :integer
+#  question_type   :string
+#  min             :float
+#  max             :float
+#  weight          :float
+#  created_at      :datetime
+#  updated_at      :datetime
+#  score_type      :integer
+#  deleted_at      :datetime
 #
 
 class ScoreUnit < ActiveRecord::Base

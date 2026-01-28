@@ -19,7 +19,6 @@
 #  deleted_at          :datetime
 #  randomized_data     :text
 #  rank_order          :string
-#  other_text          :text
 #
 
 require 'spec_helper'

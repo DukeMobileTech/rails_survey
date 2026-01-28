@@ -81,10 +81,11 @@ ActiveAdmin.register Project do
       project = Project.find(params[:id])
       temp_file = Tempfile.new(["project-#{project.id}-questions", ".csv"])
       # temp_file.write(project.questions_to_csv)
-      temp_file.write(project.similar_questions_to_csv)
+      # temp_file.write(project.similar_questions_to_csv)
+      temp_file.write(project.neighboring_questions_to_csv)
       temp_file.rewind
       send_file temp_file.path, type: 'text/csv; charset=iso-8859-1; header=present',
-                  disposition: "attachment; filename=#{project.name}-questions.csv"
+                  disposition: "attachment; filename=POFO-III-similar-questions.csv"
     end
   end
 end

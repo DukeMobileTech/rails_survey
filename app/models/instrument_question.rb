@@ -4,20 +4,18 @@
 #
 # Table name: instrument_questions
 #
-#  id                       :integer          not null, primary key
-#  question_id              :integer
-#  instrument_id            :integer
-#  number_in_instrument     :integer
-#  display_id               :integer
-#  created_at               :datetime
-#  updated_at               :datetime
-#  identifier               :string
-#  deleted_at               :datetime
-#  table_identifier         :string
-#  loop_questions_count     :integer          default(0)
-#  carry_forward_identifier :string
-#  position                 :integer
-#  skip_operation           :string
+#  id                   :integer          not null, primary key
+#  question_id          :integer
+#  instrument_id        :integer
+#  number_in_instrument :integer
+#  display_id           :integer
+#  created_at           :datetime
+#  updated_at           :datetime
+#  identifier           :string
+#  deleted_at           :datetime
+#  table_identifier     :string
+#  loop_questions_count :integer          default(0)
+#  embedding            :vector(1536)
 #
 
 class InstrumentQuestion < ActiveRecord::Base
@@ -35,6 +33,10 @@ class InstrumentQuestion < ActiveRecord::Base
   has_many :all_loop_questions, -> { with_deleted }, class_name: 'LoopQuestion'
   has_many :critical_responses, through: :question
 
+  has_neighbors :embedding
+  has_neighbors :embedding_qtext
+  has_neighbors :embedding_otext
+
   acts_as_paranoid
   has_paper_trail
   acts_as_taggable
@@ -44,6 +46,51 @@ class InstrumentQuestion < ActiveRecord::Base
 
   after_update :update_display_instructions, if: :number_in_instrument_changed?
   after_destroy :renumber_questions
+
+  def generate_embedding
+    sanitized_qtext = sanitized_question_text
+    sanitizer = Rails::Html::FullSanitizer.new
+    options_text = question.options.map { |opt| sanitizer.sanitize(opt.text.to_s).squish }.join(' $ ') if question.options.present?
+    prompt = "Question Text: #{sanitized_qtext}"
+    prompt += "\nOptions Text: #{options_text}" if options_text.present?
+
+    self.embedding = open_ai_embedding(prompt)
+    if options_text.blank?
+      self.embedding_otext = nil
+      self.embedding_qtext = self.embedding
+    else
+      self.embedding_qtext = open_ai_embedding("Question Text: #{sanitized_qtext}")
+      self.embedding_otext = open_ai_embedding("Options Text: #{options_text}")
+    end
+    save!
+  end
+
+  def open_ai_embedding(prompt)
+    api_key = ENV['OPEN_AI_API_KEY']
+    raise 'OpenAI API key not set (OPEN_AI_API_KEY)' unless api_key.present?
+
+    client = OpenAI::Client.new(access_token: api_key)
+
+    resp = client.embeddings(parameters: { model: 'text-embedding-3-small', input: prompt })
+    vector = resp.dig('data', 0, 'embedding') || resp.dig(:data, 0, :embedding)
+    unless vector && vector.is_a?(Array)
+      Rails.logger.error "generate_embedding: no vector returned: #{resp.inspect}"
+      return nil
+    end
+
+    expected = self.class.columns_hash['embedding']&.limit
+    if expected && vector.length != expected
+      Rails.logger.error "generate_embedding: embedding length #{vector.length} != expected #{expected}"
+      raise "embedding length mismatch: got #{vector.length}, expected #{expected}"
+    end
+
+    vector
+  rescue => e
+    bt = Array(e.backtrace).join("\n")
+    Rails.logger.error("generate_embedding failed for InstrumentQuestion id=#{id}: #{e.class}: #{e.message}\n#{bt}")
+    errors.add(:base, "Embedding generation failed: #{e.message}")
+    false
+  end
 
   def country_specific(language, code)
     return false if language == 'en' || country_list.blank?
@@ -84,6 +131,27 @@ class InstrumentQuestion < ActiveRecord::Base
 
   def text
     question.text
+  end
+
+  def sanitized_question_text
+    sanitizer = Rails::Html::FullSanitizer.new
+    # nil-safe
+    text = sanitizer.sanitize(question.text.to_s)
+    # remove Cambodia Only, Kenya Only, Tanzania Only and Ethiopia Only markers, allow optional surrounding asterisks or parentheses/brackets
+    text = text.gsub(/(?:\*|\(|\[)?\s*(?:Cambodia|Kenya|Tanzania|Ethiopia)\s+Only(?:\*|\)|\])?/i, '')
+    # replace newlines with space
+    text = text.gsub(/\r\n|\r|\n/, ' ')
+    # if starting text is . or ..., remove it
+    text = text.sub(/\A(\.\.\.|\.)\s*/, '')
+    # add space after period if missing
+    text = text.gsub(/\.([^\s])/, '. \1')
+    # normalize whitespace (squish requires ActiveSupport)
+    text = text.squish
+    # final trim
+    text = text.strip
+    # downcase all text
+    text = text.downcase
+    text
   end
 
   def translated_text(language)
@@ -191,6 +259,137 @@ class InstrumentQuestion < ActiveRecord::Base
       end
     end
     "#{skip_to.strip.chop.chop} go to <b>##{next_questions&.first&.skip_to_question&.number_in_instrument}</b>"
+  end
+
+  # Find the most similar InstrumentQuestion in the given instrument.
+  # Returns the nearest InstrumentQuestion record (or nil) and sets
+  # `neighbor_distance` on the returned record when available.
+  #
+  # Example:
+  #   iq = InstrumentQuestion.find(1)
+  #   other_instrument = Instrument.find(42)
+  #   similar = iq.most_similar_in_instrument(other_instrument)
+  #   similar.neighbor_distance # => distance value (if neighbor returns it)
+  def most_similar_in_instrument(target_instrument, limit: 1, distance: 'cosine')
+    return nil unless target_instrument && target_instrument.id
+
+    # Ensure we have an embedding for this record
+    unless embedding && embedding.is_a?(Array) && embedding.any?
+      Rails.logger.warn "most_similar_in_instrument: no embedding for InstrumentQuestion id=#{id}"
+      return nil
+    end
+
+    # Use the Neighbor gem API. There are two supported forms depending on
+    # neighbor version; try to call the class-level nearest_neighbors and
+    # filter by instrument_id. If that doesn't work, fall back to in-memory
+    # similarity (slow).
+    begin
+      # Class method that accepts a vector and returns an AR relation
+      rel = InstrumentQuestion.nearest_neighbors(:embedding, embedding, distance: distance)
+      rel = rel.where(instrument_id: target_instrument.id)
+      result = rel.first(limit)
+      return result
+    rescue NoMethodError, ArgumentError => e
+      Rails.logger.info "neighbor fallback: #{e.class}: #{e.message}"
+    end
+
+    # Fallback: compute cosine similarity in Ruby across candidate rows
+    candidates = InstrumentQuestion.where(instrument_id: target_instrument.id).where.not(embedding: nil)
+    best = nil
+    best_score = -Float::INFINITY
+    candidates.find_each do |cand|
+      next unless cand.embedding.is_a?(Array) && cand.embedding.any?
+      # cosine similarity
+      dot = embedding.zip(cand.embedding).map { |a, b| a.to_f * b.to_f }.sum
+      mag_a = Math.sqrt(embedding.map { |v| v.to_f**2 }.sum)
+      mag_b = Math.sqrt(cand.embedding.map { |v| v.to_f**2 }.sum)
+      next if mag_a.zero? || mag_b.zero?
+      score = dot / (mag_a * mag_b)
+      if score > best_score
+        best_score = score
+        best = cand
+      end
+    end
+    # attach neighbor_distance for consistency with neighbor results (higher = more similar for cosine)
+    if best
+      best.define_singleton_method(:neighbor_distance) { best_score }
+    end
+    best
+  end
+
+  def neighbor_combined_distance(neighbor)
+    return nil unless neighbor && neighbor.embedding.is_a?(Array) && neighbor.embedding.any?
+    return nil unless embedding && embedding.is_a?(Array) && embedding.any?
+    # cosine similarity
+    dot = embedding.zip(neighbor.embedding).map { |a, b| a.to_f * b.to_f }.sum
+    mag_a = Math.sqrt(embedding.map { |v| v.to_f**2 }.sum)
+    mag_b = Math.sqrt(neighbor.embedding.map { |v| v.to_f**2 }.sum)
+    return nil if mag_a.zero? || mag_b.zero?
+    score = dot / (mag_a * mag_b)
+    1 - score
+  end
+
+  def neighbor_text_distance(neighbor)
+    return nil unless neighbor && neighbor.embedding_qtext.is_a?(Array) && neighbor.embedding_qtext.any?
+    return nil unless embedding_qtext && embedding_qtext.is_a?(Array) && embedding_qtext.any?
+    # cosine similarity
+    dot = embedding_qtext.zip(neighbor.embedding_qtext).map { |a, b| a.to_f * b.to_f }.sum
+    mag_a = Math.sqrt(embedding_qtext.map { |v| v.to_f**2 }.sum)
+    mag_b = Math.sqrt(neighbor.embedding_qtext.map { |v| v.to_f**2 }.sum)
+    return nil if mag_a.zero? || mag_b.zero?
+    score = dot / (mag_a * mag_b)
+    1 - score
+  end
+
+  def neighbor_option_distance(neighbor)
+    return nil unless neighbor && neighbor.embedding_otext.is_a?(Array) && neighbor.embedding_otext.any?
+    return nil unless embedding_otext && embedding_otext.is_a?(Array) && embedding_otext.any?
+    # cosine similarity
+    dot = embedding_otext.zip(neighbor.embedding_otext).map { |a, b| a.to_f * b.to_f }.sum
+    mag_a = Math.sqrt(embedding_otext.map { |v| v.to_f**2 }.sum)
+    mag_b = Math.sqrt(neighbor.embedding_otext.map { |v| v.to_f**2 }.sum)
+    return nil if mag_a.zero? || mag_b.zero?
+    score = dot / (mag_a * mag_b)
+    1 - score
+  end
+
+  def most_similar_in_instrument_text(target_instrument, limit: 1, distance: 'cosine')
+    return nil unless target_instrument && target_instrument.id
+
+    unless embedding_qtext && embedding_qtext.is_a?(Array) && embedding_qtext.any?
+      Rails.logger.warn "most_similar_in_instrument_text: no embedding for InstrumentQuestion id=#{id}"
+      return nil
+    end
+
+    begin
+      rel = InstrumentQuestion.nearest_neighbors(:embedding_qtext, embedding_qtext, distance: distance)
+      rel = rel.where(instrument_id: target_instrument.id)
+      result = rel.first(limit)
+      return result
+    rescue NoMethodError, ArgumentError => e
+      Rails.logger.info "neighbor fallback: #{e.class}: #{e.message}"
+    end
+
+    candidates = InstrumentQuestion.where(instrument_id: target_instrument.id).where.not(embedding_qtext: nil)
+    best = nil
+    best_score = -Float::INFINITY
+    candidates.find_each do |cand|
+      next unless cand.embedding_qtext.is_a?(Array) && cand.embedding_qtext.any?
+      dot = embedding_qtext.zip(cand.embedding_qtext).map { |a, b| a.to_f * b.to_f }.sum
+      mag_a = Math.sqrt(embedding_qtext.map { |v| v.to_f**2 }.sum)
+      mag_b = Math.sqrt(cand.embedding_qtext.map { |v| v.to_f**2 }.sum)
+      next if mag_a.zero? || mag_b.zero?
+      score = dot / (mag_a * mag_b)
+      if score > best_score
+        best_score = score
+        best = cand
+      end
+    end
+
+    if best
+      best.define_singleton_method(:neighbor_distance) { best_score }
+    end
+    best
   end
 
   def slider_variant?

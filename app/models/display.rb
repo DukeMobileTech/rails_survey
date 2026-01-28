@@ -4,6 +4,7 @@
 # Table name: displays
 #
 #  id                         :integer          not null, primary key
+#  mode                       :string
 #  position                   :integer
 #  instrument_id              :integer
 #  created_at                 :datetime
@@ -12,7 +13,6 @@
 #  deleted_at                 :datetime
 #  section_id                 :integer
 #  instrument_questions_count :integer
-#  instrument_position        :integer
 #
 
 class Display < ActiveRecord::Base

@@ -2,15 +2,16 @@
 #
 # Table name: option_scores
 #
-#  id                     :integer          not null, primary key
-#  score_unit_question_id :integer
-#  value                  :float
-#  created_at             :datetime
-#  updated_at             :datetime
-#  deleted_at             :datetime
-#  option_identifier      :string
-#  follow_up_qid          :string
-#  position               :string
+#  id            :integer          not null, primary key
+#  score_unit_id :integer
+#  option_id     :integer
+#  value         :float
+#  created_at    :datetime
+#  updated_at    :datetime
+#  label         :string
+#  exists        :boolean
+#  next_question :boolean
+#  deleted_at    :datetime
 #
 
 class OptionScore < ActiveRecord::Base

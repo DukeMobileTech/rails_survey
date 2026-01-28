@@ -4,19 +4,25 @@
 #
 # Table name: instruments
 #
-#  id                         :integer          not null, primary key
-#  title                      :string
-#  created_at                 :datetime
-#  updated_at                 :datetime
-#  language                   :string
-#  alignment                  :string
-#  instrument_questions_count :integer          default(0)
-#  project_id                 :integer
-#  published                  :boolean
-#  deleted_at                 :datetime
-#  require_responses          :boolean          default(FALSE)
-#  scorable                   :boolean          default(FALSE)
-#  auto_export_responses      :boolean          default(TRUE)
+#  id                      :integer          not null, primary key
+#  title                   :string
+#  created_at              :datetime
+#  updated_at              :datetime
+#  language                :string
+#  alignment               :string
+#  child_update_count      :integer          default(0)
+#  previous_question_count :integer
+#  project_id              :integer
+#  published               :boolean
+#  deleted_at              :datetime
+#  show_instructions       :boolean          default(FALSE)
+#  special_options         :text
+#  show_sections_page      :boolean          default(FALSE)
+#  navigate_to_review_page :boolean          default(FALSE)
+#  roster                  :boolean          default(FALSE)
+#  roster_type             :string
+#  scorable                :boolean          default(FALSE)
+#  auto_export_responses   :boolean          default(TRUE)
 #
 
 class Instrument < ActiveRecord::Base
@@ -28,7 +34,7 @@ class Instrument < ActiveRecord::Base
   scope :published, -> { where(published: true) }
   belongs_to :project, touch: true
 
-  has_many :instrument_questions, dependent: :destroy
+  has_many :instrument_questions, -> { order 'number_in_instrument' }, dependent: :destroy
   has_many :questions, -> { distinct }, through: :instrument_questions
   has_many :question_translations, through: :questions, source: :translations
   has_many :option_sets, -> { distinct }, through: :questions

@@ -15,7 +15,8 @@ development:
   # database: chpir_survey_01
   # database: pofo_production
   # database: pofo_development
-  database: pofo_production_1
+  # database: pofo_production_1
+  database: pofo_embeddings
   pool: 5
   # timeout: 5000
 
