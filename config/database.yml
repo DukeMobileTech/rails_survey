@@ -16,7 +16,8 @@ development:
   # database: pofo_production
   # database: pofo_development
   # database: pofo_production_1
-  database: pofo_embeddings
+  # database: pofo_embeddings
+  database: pofo_ii_iii_embeddings
   pool: 5
   # timeout: 5000
 

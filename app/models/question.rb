@@ -26,12 +26,12 @@
 
 class Question < ActiveRecord::Base
   include Translatable
-  belongs_to :option_set
-  belongs_to :special_option_set, class_name: 'OptionSet'
+  belongs_to :option_set, optional: true
+  belongs_to :special_option_set, class_name: 'OptionSet', optional: true
   belongs_to :question_set
-  belongs_to :instruction
+  belongs_to :instruction, optional: true
   belongs_to :folder
-  belongs_to :validation
+  belongs_to :validation, optional: true
   # belongs_to :pop_up_instruction, class_name: 'Instruction'
   # belongs_to :after_text_instruction, class_name: 'Instruction'
 

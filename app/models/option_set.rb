@@ -15,7 +15,7 @@
 #
 
 class OptionSet < ActiveRecord::Base
-  belongs_to :instruction
+  belongs_to :instruction, optional: true
   has_many :option_in_option_sets, -> { order 'number_in_question' }, dependent: :destroy
   has_many :options, through: :option_in_option_sets
   has_many :translations, through: :options

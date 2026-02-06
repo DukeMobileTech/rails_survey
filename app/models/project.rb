@@ -105,6 +105,10 @@ class Project < ActiveRecord::Base
     instruments.where(published: true)
   end
 
+  def self.all_published_instruments
+    Instrument.where(published: true)
+  end
+
   def instrument_response_exports
     ResponseExport.where(instrument_id: instrument_ids).order('created_at desc')
   end
@@ -220,10 +224,129 @@ class Project < ActiveRecord::Base
     end
   end
 
+  def self.generate_neighbor_data
+    all_published_instruments.each do |instrument|
+      instrument.instrument_questions.each do |iq|
+        NeighborDataWorker.perform_async(iq.id)
+      end
+    end
+  end
+
+  def self.pofo_similar_questions
+    sanitizer = Rails::Html::FullSanitizer.new
+    # no-cutoff, 0.25-cutoff, 0.10-cutoff
+    # cutoff_values = [2.0, 0.25, 0.10]
+    header = ['question_number', 'question_sequence', 'instrument_title', 'section_title', 'display_title', 'question_identifier', 'neighbor_distance', 'neighbor_text_distance', 'neighbor_option_distance', 'question_text', 'sanitized_question_text']
+    20.times do |i|
+      header << "option_#{i}"
+    end
+    # generate csv for no-cutoff
+    # no_cutoff_file = Tempfile.new(["POFO-similar-questions-by-combined-distance-no-cutoff", ".csv"])
+    # cutoff_0_10_file = Tempfile.new(["POFO-similar-questions-by-combined-distance-cutoff-0.10", ".csv"])
+    # cutoff_0_25_file = Tempfile.new(["POFO-similar-questions-by-combined-distance-cutoff-0.25", ".csv"])
+    cutoff_0_10_file = Tempfile.new(["POFO-similar-questions-by-text-distance-cutoff-0.10", ".csv"])
+    cutoff_0_25_file = Tempfile.new(["POFO-similar-questions-by-text-distance-cutoff-0.25", ".csv"])
+
+    list_0_10 = []
+    list_0_25 = []
+    # list_no_cutoff = []
+
+    # cutoff_0_25_file.write(CSV.generate do |csv|
+      # csv << header
+      all_published_instruments.order(:id).each do |instrument|
+        instrument.instrument_questions.order(:number_in_instrument).each do |iq|
+          prefix = iq.instrument.project.name == 'POFO III' ? "p3#" : ""
+          row = [iq.number_in_instrument, '', instrument.title, iq.section_title, iq.display_title, "#{prefix}#{iq.identifier}", '', '', '', sanitizer.sanitize(iq.question.text).to_s.strip, iq.sanitized_question_text]
+          iq.non_special_options.each do |opt|
+            row << sanitizer.sanitize(opt.text).to_s.strip
+          end
+          # csv << row
+          list_0_10 << row
+          list_0_25 << row
+          # list_no_cutoff << row
+          combined_hash = JSON.parse(iq.neighbors_by_combined_distance || '{}')
+          text_hash = JSON.parse(iq.neighbors_by_text_distance || '{}')
+          rows = []
+          # combined_hash.each do |instrument_id, iq_neighbor_data|
+          text_hash.each do |instrument_id, iq_neighbor_data|
+            new_instrument = Instrument.find_by(id: instrument_id.to_i)
+            iq_neighbor_hash = JSON.parse(iq_neighbor_data || '{}')
+            sequence = 1
+            iq_neighbor_hash.each do |neighbor_iq_id, neighbor_data|
+              distances = neighbor_data.split(',')
+              next if distances[0].to_f > 0.25
+
+              neighbor = new_instrument.instrument_questions.find_by(id: neighbor_iq_id.to_i)
+              prefix = neighbor.instrument.project.name == 'POFO III' ? "p3#" : ""
+              row = ['', sequence, new_instrument.title, neighbor.section_title, neighbor.display_title, "#{prefix}#{neighbor.identifier}", distances[0], distances[1], distances[2], sanitizer.sanitize(neighbor.question.text).to_s.strip, neighbor.sanitized_question_text]
+              neighbor.non_special_options.each do |opt|
+                row << sanitizer.sanitize(opt.text).to_s.strip
+              end
+              rows << row
+              sequence += 1
+            end
+          end
+          # sort rows by neighbor_distance (6th column or 7th column) from smallest to largest
+          # rows.sort_by! { |r| r[6] || Float::INFINITY }
+          rows.sort_by! { |r| r[7] || Float::INFINITY }
+          rows.each do |r|
+            # csv << r
+            # list_no_cutoff << r
+            # if r[6].to_f <= 0.25
+            if r[7].to_f <= 0.25
+              list_0_25 << r
+            end
+            # if r[6].to_f <= 0.10
+            if r[7].to_f <= 0.10
+              list_0_10 << r
+            end
+          end
+          # csv << [] # Blank line between different questions
+          # list_no_cutoff << []
+          list_0_25 << []
+          list_0_10 << []
+        end
+        # break # test first instrument only; TODO: remove this break to generate for all instruments (warning: will take a long time and generate a very large file)
+      end
+    # end)
+
+    # write to files
+    # no_cutoff_file.write(CSV.generate do |csv|
+    #   csv << header
+    #   list_no_cutoff.each do |r|
+    #     csv << r
+    #   end
+    # end)
+    cutoff_0_10_file.write(CSV.generate do |csv|
+      csv << header
+      list_0_10.each do |r|
+        csv << r
+      end
+    end)
+    cutoff_0_25_file.write(CSV.generate do |csv|
+      csv << header
+      list_0_25.each do |r|
+        csv << r
+      end
+    end)
+
+    # create a zip file and add the csv file to it
+    zip_file = Tempfile.new(["POFO-similar-questions", ".zip"])
+    Zip::File.open(zip_file.path, Zip::File::CREATE) do |zip|
+      # zip.add("pofo2-pofo3-similar-questions-by-combined-distance-no-cutoff.csv", no_cutoff_file.path)
+      # zip.add("pofo2-pofo3-similar-questions-by-combined-distance-cutoff-0.10.csv", cutoff_0_10_file.path)
+      # zip.add("pofo2-pofo3-similar-questions-by-combined-distance-cutoff-0.25.csv", cutoff_0_25_file.path)
+      zip.add("pofo2-pofo3-similar-questions-by-text-distance-cutoff-0.10.csv", cutoff_0_10_file.path)
+      zip.add("pofo2-pofo3-similar-questions-by-text-distance-cutoff-0.25.csv", cutoff_0_25_file.path)
+    end
+    # send the zip file to download method
+    zip_file
+  end
+
   def neighboring_questions_to_csv
-    sort_position = 7 # 6
+    sort_position = 7 # 6 = combined, 7 = text
     decimal_limit = 0.00001
-    distance_cutoff = 2.0
+    distance_cutoff = 0.10 # 0.10, 0.25, 2.0
     similar_limit = 5
     sanitizer = Rails::Html::FullSanitizer.new
     header = ['question_number', 'question_sequence', 'instrument_title', 'section_title', 'display_title', 'question_identifier', 'neighbor_distance', 'neighbor_text_distance', 'neighbor_option_distance', 'question_text', 'sanitized_question_text']

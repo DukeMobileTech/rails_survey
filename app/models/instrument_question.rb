@@ -4,18 +4,22 @@
 #
 # Table name: instrument_questions
 #
-#  id                   :integer          not null, primary key
-#  question_id          :integer
-#  instrument_id        :integer
-#  number_in_instrument :integer
-#  display_id           :integer
-#  created_at           :datetime
-#  updated_at           :datetime
-#  identifier           :string
-#  deleted_at           :datetime
-#  table_identifier     :string
-#  loop_questions_count :integer          default(0)
-#  embedding            :vector(1536)
+#  id                             :integer          not null, primary key
+#  question_id                    :integer
+#  instrument_id                  :integer
+#  number_in_instrument           :integer
+#  display_id                     :integer
+#  created_at                     :datetime
+#  updated_at                     :datetime
+#  identifier                     :string
+#  deleted_at                     :datetime
+#  table_identifier               :string
+#  loop_questions_count           :integer          default(0)
+#  embedding                      :vector(1536)
+#  embedding_qtext                :vector(1536)
+#  embedding_otext                :vector(1536)
+#  neighbors_by_text_distance     :text
+#  neighbors_by_combined_distance :text
 #
 
 class InstrumentQuestion < ActiveRecord::Base
@@ -38,7 +42,7 @@ class InstrumentQuestion < ActiveRecord::Base
   has_neighbors :embedding_otext
 
   acts_as_paranoid
-  has_paper_trail
+  has_paper_trail ignore: [:embedding, :embedding_qtext, :embedding_otext, :neighbors_by_text_distance, :neighbors_by_combined_distance]
   acts_as_taggable
   acts_as_taggable_on :countries
 
@@ -46,6 +50,54 @@ class InstrumentQuestion < ActiveRecord::Base
 
   after_update :update_display_instructions, if: :number_in_instrument_changed?
   after_destroy :renumber_questions
+
+  def generate_neighbor_data
+    other_instruments = Instrument.where(published: true).where.not(id: instrument_id).order(:id)
+    neighbors_by_combined_distance = {}
+    neighbors_by_text_distance = {}
+    other_instruments.each do |other_instrument|
+      combined_neighbors = most_similar_in_instrument(other_instrument, limit: 5)
+      text_neighbors = most_similar_in_instrument_text(other_instrument, limit: 5)
+      neighbors_by_combined_distance["#{other_instrument.id}-combined"] = combined_neighbors unless combined_neighbors.blank?
+      neighbors_by_text_distance["#{other_instrument.id}-text"] = text_neighbors unless text_neighbors.blank?
+    end
+    # combined distance hash for iq. key is instrument id, value is another hash with key neighbor id and value a comma separated string of combined distance, text distance, option distance
+    combined_distance_hash = {}
+    text_distance_hash = {}
+    neighbors_by_combined_distance.each do |key, neighbors|
+      neighbor_combined_distance_hash = {}
+      neighbors.each do |neighbor|
+        if neighbor && neighbor.neighbor_distance
+          combined_distance = neighbor.neighbor_distance
+          combined_distance = (combined_distance.abs < 0.00001 ? 0.0 : combined_distance.round(5)) if combined_distance
+          text_distance = neighbor_text_distance(neighbor)
+          text_distance = (text_distance.abs < 0.00001 ? 0.0 : text_distance.round(5)) if text_distance
+          option_distance = neighbor_option_distance(neighbor)
+          option_distance = (option_distance.abs < 0.00001 ? 0.0 : option_distance.round(5)) if option_distance
+          neighbor_combined_distance_hash[neighbor.id] = "#{combined_distance&.round(5)},#{text_distance&.round(5)},#{option_distance&.round(5)}"
+        end
+      end
+      combined_distance_hash[key.split('-').first] = JSON.generate neighbor_combined_distance_hash
+    end
+    neighbors_by_text_distance.each do |key, neighbors|
+      neighbor_text_distance_hash = {}
+      neighbors.each do |neighbor|
+        if neighbor && neighbor.neighbor_distance
+          combined_distance = neighbor_combined_distance(neighbor)
+          combined_distance = (combined_distance.abs < 0.00001 ? 0.0 : combined_distance.round(5)) if combined_distance
+          text_distance = neighbor.neighbor_distance
+          text_distance = (text_distance.abs < 0.00001 ? 0.0 : text_distance.round(5)) if text_distance
+          option_distance = neighbor_option_distance(neighbor)
+          option_distance = (option_distance.abs < 0.00001 ? 0.0 : option_distance.round(5)) if option_distance
+          neighbor_text_distance_hash[neighbor.id] = "#{combined_distance&.round(5)},#{text_distance&.round(5)},#{option_distance&.round(5)}"
+        end
+      end
+      text_distance_hash[key.split('-').first] = JSON.generate neighbor_text_distance_hash
+    end
+    neighbors_by_combined_distance = JSON.generate(combined_distance_hash)
+    neighbors_by_text_distance = JSON.generate(text_distance_hash)
+    update(neighbors_by_combined_distance: neighbors_by_combined_distance, neighbors_by_text_distance: neighbors_by_text_distance)
+  end
 
   def generate_embedding
     sanitized_qtext = sanitized_question_text

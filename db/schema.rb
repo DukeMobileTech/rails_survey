@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2025_10_17_182418) do
+ActiveRecord::Schema.define(version: 2026_01_30_091500) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
@@ -280,6 +280,8 @@ ActiveRecord::Schema.define(version: 2025_10_17_182418) do
     t.vector "embedding", limit: 1536
     t.vector "embedding_qtext", limit: 1536
     t.vector "embedding_otext", limit: 1536
+    t.text "neighbors_by_text_distance"
+    t.text "neighbors_by_combined_distance"
     t.index ["deleted_at"], name: "index_instrument_questions_on_deleted_at"
     t.index ["display_id"], name: "index_instrument_questions_on_display_id"
     t.index ["identifier"], name: "index_instrument_questions_on_identifier"

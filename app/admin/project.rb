@@ -78,14 +78,17 @@ ActiveAdmin.register Project do
     end
 
     def questions_to_csv
-      project = Project.find(params[:id])
-      temp_file = Tempfile.new(["project-#{project.id}-questions", ".csv"])
+      # project = Project.find(params[:id])
+      # temp_file = Tempfile.new(["project-#{project.id}-questions", ".csv"])
       # temp_file.write(project.questions_to_csv)
       # temp_file.write(project.similar_questions_to_csv)
-      temp_file.write(project.neighboring_questions_to_csv)
-      temp_file.rewind
-      send_file temp_file.path, type: 'text/csv; charset=iso-8859-1; header=present',
-                  disposition: "attachment; filename=POFO-III-similar-questions.csv"
+      # temp_file.write(project.neighboring_questions_to_csv)
+      # temp_file.rewind
+      # send_file temp_file.path, type: 'text/csv; charset=iso-8859-1; header=present',
+      #             disposition: "attachment; filename=POFO-III-similar-questions.csv"
+      zipfile = Project.pofo_similar_questions
+      send_file zipfile.path, type: 'application/zip; charset=iso-8859-1; header=present',
+                  disposition: "attachment; filename=POFO-III-similar-questions.zip"
     end
   end
 end
